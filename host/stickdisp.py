@@ -188,7 +188,7 @@ def disp_callback(disp):
         # print("Shutdown")
         # disp.power_off()
         disp.close()
-        # os.system('shutdown -h now')
+        # os.system('shutdown -h now &')
         sys.exit(1)
     if s == 'b0A':
         disp.set_led(not disp.get_led())
