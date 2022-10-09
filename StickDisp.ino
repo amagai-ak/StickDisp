@@ -1,3 +1,14 @@
+/**
+ * @file StickDisp.ino
+ * @author a.amg
+ * @brief M5stickC plus 用簡易表示端末化プログラム
+ * @version 0.1
+ * @date 2022-10-09
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
+
 #include <M5StickCPlus.h>
 #include <time.h> 
 
@@ -11,7 +22,7 @@ hw_timer_t *wdtimer = NULL;
 #define LCDCONTENT_MAXSCENE 3
 #define LCDCONTENT_VALLINES 4
 
-#define VERSION_STRING "1.0.0"
+#define VERSION_STRING "0.1.0"
 
 typedef struct tLCDCONTENT {
     int scene;
@@ -30,6 +41,8 @@ typedef struct tBEEPCTRL {
 } BEEPCTRL;
 
 static BEEPCTRL beepctrl;
+
+static int loopcount = 0;
 
 void LCDC_init() 
 {
@@ -53,8 +66,6 @@ void LCDC_init()
 }
 
 
-static int loopcount = 0;
-
 /**
  * @brief 時計画面の描画
  */
@@ -62,16 +73,6 @@ void LCDC_show_scene0()
 {
     sprite.fillRect(0,0,M5.Lcd.width(), M5.Lcd.height(), BLACK);
     sprite.setTextColor(WHITE, BLACK);
-
-    /*
-    // for debug
-    // https://karakuri-musha.com/inside-technology/arduino-m5stickc-04-time-display-for-m5stickc/
-    sprite.setTextFont(2); // 16pix font
-    sprite.setTextSize(1);
-    sprite.setCursor(0,0);
-    sprite.printf("Loop=%d", loopcount);
-    // sprite.drawString("Loop=" + String(loopcount++), 0, 32, 4);
-    */
 
     // Current time
     sprite.setTextFont(4);  // 26pixel font
@@ -84,7 +85,6 @@ void LCDC_show_scene0()
     sprite.setTextFont(4);  // 26pixel font
     sprite.setTextSize(1);
     sprite.setCursor(0, 84);
-//    sprite.printf("IP:%16s", lcdinfo.ipstr);
     sprite.print(lcdinfo.toppgstr[0]);
     sprite.setCursor(0, 110);
     sprite.print(lcdinfo.toppgstr[1]);
@@ -327,7 +327,8 @@ int serial_cmd(const uint8_t *buf)
         return 1;
     }
 
-    switch( buf[0] ){
+    switch( buf[0] )
+    {
         // Read RTC
         case 'r':
             rtc_read(&tm);
@@ -366,7 +367,8 @@ int serial_cmd(const uint8_t *buf)
         // 時刻画面に表示する文字列
         case 't':
             n = buf[1] - '0';
-            if( n < 0 || n > 1 ){
+            if( n < 0 || n > 1 )
+            {
                 return 1;
             }
             lcdinfo.toppgstr[n] = (const char*)&buf[2];
@@ -379,12 +381,16 @@ int serial_cmd(const uint8_t *buf)
 
         // LED
         case 'l':
-            if( buf[1] == '1' ){
+            if( buf[1] == '1' )
+            {
                 lcdinfo.led = 1;
-            }else if (buf[1] == '2'){
+            }
+            else if (buf[1] == '2')
+            {
                 lcdinfo.led = 2;
             }
-            else{
+            else
+            {
                 lcdinfo.led = 0;
             }
             break;
@@ -392,7 +398,8 @@ int serial_cmd(const uint8_t *buf)
         // Scene選択
         case 's':
             scn = buf[1] - '0';
-            if( scn < 0 || scn >= LCDCONTENT_MAXSCENE ){
+            if( scn < 0 || scn >= LCDCONTENT_MAXSCENE )
+            {
                 return 1;
             }
             lcdinfo.scene = scn;
@@ -403,10 +410,12 @@ int serial_cmd(const uint8_t *buf)
         case 'v':
             l = buf[1] - '0';
             c = buf[2] - '0';
-            if( l < 0 || l >= LCDCONTENT_VALLINES ){
+            if( l < 0 || l >= LCDCONTENT_VALLINES )
+            {
                 return 1;
             }
-            if( c < 0 || c > 1 ){
+            if( c < 0 || c > 1 )
+            {
                 return 1;
             }
             lcdinfo.valuestr[l][c] = (const char*)&buf[3];
@@ -443,21 +452,27 @@ int serial_parse(uint8_t c)
     }
 
     rtn = 0;
-    switch(rxstate){
+    switch(rxstate)
+    {
         case 0:
-            if(c == '$'){
+            if(c == '$')
+            {
                 rxptr = 0;
                 rxstate = 1;
             }
             break;
         case 1:
-            if(c == '\r' || c == '\n' ){
+            if(c == '\r' || c == '\n' )
+            {
                 rxbuf[rxptr] = 0;
                 rtn = serial_cmd(rxbuf);
                 rxstate = 0;
-            }else{
+            }
+            else
+            {
                 rxbuf[rxptr++] = c;
-                if( rxptr >= sizeof(rxbuf) ){   // overflow
+                if( rxptr >= sizeof(rxbuf) )   // overflow
+                {
                     rxstate = 0;
                     rxptr = 0;
                     rtn = 1;
@@ -479,10 +494,12 @@ int serial_parse(uint8_t c)
  */
 void beep_poll()
 {
-    if( beepctrl.count > 0 ){
+    if( beepctrl.count > 0 )
+    {
         beepctrl.count--;
     }
-    else{
+    else
+    {
         M5.Beep.mute();
     }
 }
@@ -514,20 +531,24 @@ void loop()
     timerWrite(wdtimer, 0);
 
     M5.update();
-    while( Serial.available() > 0 ){
+    while( Serial.available() > 0 )
+    {
         rxc = Serial.read();
         serial_parse(rxc);
     }
 
-    if( M5.BtnA.wasPressed() ){
+    if( M5.BtnA.wasPressed() )
+    {
         Serial.printf("$b%dA\r\n", lcdinfo.scene);
         beep_trigger(1000, 10);
     }
 
-    if( M5.BtnB.wasPressed() ){
+    if( M5.BtnB.wasPressed() )
+    {
         Serial.printf("$b%dB\r\n", lcdinfo.scene);
         lcdinfo.scene++;
-        if( lcdinfo.scene >= LCDCONTENT_MAXSCENE ){
+        if( lcdinfo.scene >= LCDCONTENT_MAXSCENE )
+        {
             lcdinfo.scene = 0;
         }
     }
@@ -535,7 +556,8 @@ void loop()
     beep_poll();
 
     // 画面は100ms毎に更新
-    if( loopcount % 10 == 0){
+    if( loopcount % 10 == 0)
+    {
         rtc_read(&lcdinfo.dttime);
         LCDC_show();
     }
