@@ -229,7 +229,8 @@ def main(args):
         return 0
 
     disp.set_led(False)
-    disp.set_rtc()
+    if args.update_rtc:
+        disp.set_rtc()
     if args.text1 != None:
         disp.set_text(0, args.text1)
     if args.text2 != None:
