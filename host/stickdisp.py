@@ -183,7 +183,7 @@ def disp_callback(disp):
     global debuglevel
     s = disp.get_rxstr()
     if debuglevel > 0:
-        print("Callback :" + s)
+        sys.stderr.write("Callback :" + s + "\n")
     if s == 'b2A':
         # print("Shutdown")
         # disp.power_off()
@@ -258,7 +258,7 @@ def main(args):
         # 60秒に1回rtcを更新する
         if args.update_rtc and t_f > 0.8 and t_f < 0.95 and t_now % 60 == 0:
             if debuglevel > 0:
-                print("RTC Updated")
+                sys.stderr.write("RTC Updated\n")
             disp.set_rtc()
         # 毎秒の処理
         if t_old != t_now:
