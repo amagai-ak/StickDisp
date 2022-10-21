@@ -29,6 +29,7 @@ typedef struct tLCDCONTENT {
     struct tm dttime;
     uint8_t led;
     int debug;
+    uint16_t clk_color;
     String valuestr[LCDCONTENT_VALLINES][2];
     String toppgstr[2];
 } LCDCONTENT;
@@ -52,6 +53,7 @@ void LCDC_init()
     lcdinfo.dttime.tm_sec = 0;
     lcdinfo.led = 0;
     lcdinfo.debug = 0;
+    lcdinfo.clk_color = WHITE;
 
     M5.Lcd.setRotation(1);
     sprite.setColorDepth(16);
@@ -72,16 +74,19 @@ void LCDC_init()
 void LCDC_show_scene0()
 {
     sprite.fillRect(0,0,M5.Lcd.width(), M5.Lcd.height(), BLACK);
-    sprite.setTextColor(WHITE, BLACK);
 
     // Current time
+    sprite.setTextColor(WHITE, BLACK);
     sprite.setTextFont(4);  // 26pixel font
     sprite.setCursor(0,0);
     sprite.printf("%04d/%02d/%02d", lcdinfo.dttime.tm_year + 1900, lcdinfo.dttime.tm_mon + 1, lcdinfo.dttime.tm_mday);
+
+    sprite.setTextColor(lcdinfo.clk_color, BLACK);
     sprite.setTextFont(7);  // 48pixel font
     sprite.setCursor(0,30);
     sprite.printf("%02d:%02d:%02d", lcdinfo.dttime.tm_hour, lcdinfo.dttime.tm_min, lcdinfo.dttime.tm_sec);
 
+    sprite.setTextColor(WHITE, BLACK);
     sprite.setTextFont(4);  // 26pixel font
     sprite.setTextSize(1);
     sprite.setCursor(0, 84);
@@ -312,6 +317,30 @@ int serial_isvalid(const uint8_t *buf)
 
 
 /**
+ * @brief hex文字から整数へ変換．
+ * 
+ * @param c 
+ * @return 変換した整数(0-15)．失敗した場合は-1
+ */
+inline int hexchar2dec(char c)
+{
+    if( c >= '0' && c <= '9' )
+    {
+        return c - '0';
+    }
+    if( c >= 'A' && c <= 'F' )
+    {
+        return c - 'A' + 10;
+    }
+    if( c >= 'a' && c <= 'f' )
+    {
+        return c - 'a' + 10;
+    }
+    return -1;
+}
+
+
+/**
  * @brief コマンドを1つ処理する
  * @param buf コマンド文字列
  * @return 0:正常
@@ -321,6 +350,7 @@ int serial_cmd(const uint8_t *buf)
     struct tm tm;
     int i, scn;
     int l,c,n;
+    int cr, cb, cg;
 
     if( serial_isvalid(buf) == 0 )
     {
@@ -374,6 +404,18 @@ int serial_cmd(const uint8_t *buf)
             lcdinfo.toppgstr[n] = (const char*)&buf[2];
             break;
 
+        // 時刻の文字の色
+        // cRGB で，R,G,Bはそれぞれ0-Fの値．M5StickのRGBはビット数が565なので，変換が必要．
+        case 'c':
+            cr = hexchar2dec(buf[1]) * 15;
+            cb = hexchar2dec(buf[2]) * 15;
+            cg = hexchar2dec(buf[3]) * 15;
+            if( cr >= 0 && cb >= 0 && cg >= 0 )
+            {
+                lcdinfo.clk_color = M5.lcd.color565(cr, cg, cb);
+            }
+            break;
+
         // Power off
         case 'p':
             M5.Axp.PowerOff();
@@ -425,6 +467,10 @@ int serial_cmd(const uint8_t *buf)
         case 'V':
             Serial.printf("$Vstickdisp " VERSION_STRING "\r\n");
             break;
+
+        default:
+            // Error
+            return 1;
     }
 
     return 0;
