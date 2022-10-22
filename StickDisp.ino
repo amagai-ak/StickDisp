@@ -2,8 +2,8 @@
  * @file StickDisp.ino
  * @author a.amg
  * @brief M5stickC plus 用簡易表示端末化プログラム
- * @version 0.1
- * @date 2022-10-09
+ * @version 0.2
+ * @date 2022-10-22
  * 
  * @copyright Copyright (c) 2022
  * 
@@ -22,7 +22,7 @@ hw_timer_t *wdtimer = NULL;
 #define LCDCONTENT_MAXSCENE 3
 #define LCDCONTENT_VALLINES 4
 
-#define VERSION_STRING "0.1.0"
+#define VERSION_STRING "0.2.0"
 
 typedef struct tLCDCONTENT {
     int scene;
@@ -408,8 +408,8 @@ int serial_cmd(const uint8_t *buf)
         // cRGB で，R,G,Bはそれぞれ0-Fの値．M5StickのRGBはビット数が565なので，変換が必要．
         case 'c':
             cr = hexchar2dec(buf[1]) * 15;
-            cb = hexchar2dec(buf[2]) * 15;
-            cg = hexchar2dec(buf[3]) * 15;
+            cg = hexchar2dec(buf[2]) * 15;
+            cb = hexchar2dec(buf[3]) * 15;
             if( cr >= 0 && cb >= 0 && cg >= 0 )
             {
                 lcdinfo.clk_color = M5.lcd.color565(cr, cg, cb);
