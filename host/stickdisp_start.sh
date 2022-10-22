@@ -24,7 +24,7 @@ if [ -e $TTYDEV ]; then
     MYIP=$(echo "$IPSTR" | sed -e 's/\s*inet \([0-9]*.\.[0-9]*.\.[0-9]*.\.[0-9]*\).*/\1/g')
   fi
   echo $MYIP
-  python3 "$DISPSCRIPT" -u --text1 "$MYIP" --text2 "$(hostname)" --port $TTYDEV &
+  python3 "$DISPSCRIPT" -u --text1 "$MYIP" --text2 "$(hostname)" --port $TTYDEV --off &
 else
   echo "$TTYDEV not found" >&2
 fi

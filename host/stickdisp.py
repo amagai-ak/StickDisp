@@ -7,10 +7,21 @@ import argparse
 import os
 import time
 import serial
+import signal
 
 debuglevel = 0
+disploop = True
 
 class StickDispCtrl:
+    LCD_WHITE = (15, 15, 15)
+    LCD_BLACK = (0, 0, 0)
+    LCD_RED = (15, 0, 0)
+    LCD_GREEN = (0, 15, 0)
+    LCD_BLUE = (0, 0, 15)
+    LCD_YELLOW = (15, 15, 0)
+    LCD_CYAN = (0, 15, 15)
+    LCD_MAGENTA = (15, 0, 15)
+
     def __init__(self):
         self.led = False
         self.ser = None
@@ -25,6 +36,7 @@ class StickDispCtrl:
     def close(self):
         self.ser.close()
 
+    # LEDのOn/Off設定．ledonをtrueにするとLEDが点灯する．
     def set_led(self, ledon):
         self.led = ledon
         if ledon == True:
@@ -35,11 +47,23 @@ class StickDispCtrl:
     def get_led(self):
         return self.led
 
+    # 時計の文字色の設定する．r,g,bの値は0-15の範囲．
+    # colorは(r,g,b)のタプルで，(0,0,0)-(15,15,15)の範囲.
+    def set_clk_color(self, color):
+        r, g, b = color
+        if r < 0 or r > 15 or g < 0 or g > 15 or b < 0 or b > 15:
+            return
+        cmdstr = '$c' + '%x%x%x' % (r,g,b) + '\r\n'
+        # print("cmdstr=", cmdstr)
+        self.ser.write(cmdstr.encode())
+
+    # 時計画面の時刻の下n行目にmsgを表示する
     def set_text(self, n, msg):
         if n == 0 or n == 1:
             cmdstr = '$t' + str(n) + msg + '\r\n'
             self.ser.write(cmdstr.encode())
 
+    # M5Stickの電源を切る
     def power_off(self):
         self.ser.write(b'$p\r\n')
 
@@ -60,6 +84,7 @@ class StickDispCtrl:
         rtcstr = '$w' + dtstr + '\r\n'
         self.ser.write(rtcstr.encode())
 
+    # バージョン文字列の取得
     def get_version(self):
         self.ser.write(b'$V\r\n')
         tout = 20
@@ -104,25 +129,32 @@ class StickDispCtrl:
                 tout = tout - 1
         return None
 
+    # コールバック関数の登録．登録解除したい場合にはNoneを指定する．
     def set_callback(self, callback):
         self.callback = callback
 
     def get_rxstr(self):
         return self.rxstr
 
+    # テーブル画面でのラベル部分の文字列の設定
+    # n行目にlblを表示する
     def set_label(self, n, lbl):
         cmdstr = '$v' + str(n) + '0' + lbl + '\r\n'
         self.ser.write(cmdstr.encode())
 
+    # テーブル画面での値部分の文字列の設定
+    # n行目にlblを表示する
     def set_value(self, n, lbl):
         cmdstr = '$v' + str(n) + '1' + lbl + '\r\n'
         self.ser.write(cmdstr.encode())
 
+    # 表示する画面番号の設定．0:時計 1:表 2:シャットダウン
     def set_screen(self, n):
         if n >= 0 and n < 3:
             cmdstr = '$s' + str(n) + '\r\n'
             self.ser.write(cmdstr.encode())
 
+    # M5StickC側からのメッセージ処理のためのポーリング
     def poll(self):
         rtnstr = ''
         while True:
@@ -154,7 +186,7 @@ def get_cputemp():
     with open('/sys/class/thermal/thermal_zone0/temp') as f:
         return float(f.read()) / 1000
 
-# ファイルシステムの空き容量を取得する (GB)
+# ファイルシステムの空き容量を取得する (GiB)
 def get_freespace():
     st = os.statvfs('/')
     return (st.f_bavail * st.f_frsize) / (1024*1024*1024)
@@ -193,9 +225,13 @@ def disp_callback(disp):
     if s == 'b0A':
         disp.set_led(not disp.get_led())
 
+def signal_handler(sig, frame):
+    global disploop
+    disploop = False
 
 def main(args):
     global debuglevel
+    global disploop
 
     debuglevel = args.debug
 
@@ -216,7 +252,7 @@ def main(args):
     if args.version == True:
         vstr = disp.get_version()
         if vstr != None:
-            print(vstr)
+            sys.stdout.write(vstr)
             disp.close()
             return 0
         else:
@@ -244,12 +280,18 @@ def main(args):
     disp.set_label(3, '')
     disp.set_value(3, '')
 
+    # ボタンが押されたときのコールバック関数を登録する
     disp.set_callback(disp_callback)
 
     t_old = int(time.time())
 
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+    
+    disp.set_clk_color(StickDispCtrl.LCD_GREEN)
+
     # 100ms周期のループ
-    while True:
+    while disploop:
         # poll()はtimeout=0.1秒で抜ける
         s = disp.poll()
         t = time.time()
@@ -270,6 +312,8 @@ def main(args):
             disp.set_value(1, '%3.1f GiB' % (fs))
             disp.set_value(2, '%3.1f' % (lavg[0]))
 
+    if args.off:
+        disp.power_off()
     disp.close()
     return 0
 
@@ -283,6 +327,7 @@ if __name__ == '__main__':
     parser.add_argument('-w', '--write_rtc', help='Write current system time to RTC and exit', action='store_true')
     parser.add_argument('-u', '--update_rtc', help='Update RTC every minute', action='store_true')
     parser.add_argument('-v', '--version', help='Read version info', action='store_true')
-    parser.add_argument('-d', '--debug', help='debug mode', type=int, default=0)
+    parser.add_argument('-o', '--off', help='Turn off M5Stick when exit this program', action='store_true')
+    parser.add_argument('-d', '--debug', help='Debug level', type=int, default=0)
     args = parser.parse_args()
     sys.exit( main(args) )
