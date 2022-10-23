@@ -66,7 +66,6 @@ void LCDC_init()
         lcdinfo.valuestr[i][0] = "Label";
         lcdinfo.valuestr[i][1] = "Value";
     }
-
 }
 
 
@@ -177,6 +176,7 @@ void LCDC_show()
             break;
     }
 
+    // LED点灯状態の更新
     if( lcdinfo.led != LEDMODE_OFF )
     {
         digitalWrite(GPIO_NUM_10, LOW);     // LOWで点灯
@@ -186,7 +186,8 @@ void LCDC_show()
         digitalWrite(GPIO_NUM_10, HIGH);
     }
 
-    if( lcdinfo.led == LEDMODE_ONESHOT)     // oneshot の場合は次のタイミングでは消灯
+    // oneshot の場合は次のタイミング(100ms後)では消灯
+    if( lcdinfo.led == LEDMODE_ONESHOT)     
     {
         lcdinfo.led = LEDMODE_OFF;
     }
