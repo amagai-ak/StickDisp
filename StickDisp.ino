@@ -2,7 +2,7 @@
  * @file StickDisp.ino
  * @author a.amg
  * @brief M5stickC plus 用簡易表示端末化プログラム
- * @version 0.2
+ * @version 0.3
  * @date 2022-10-22
  * 
  * @copyright Copyright (c) 2022
@@ -22,7 +22,11 @@ hw_timer_t *wdtimer = NULL;
 #define LCDCONTENT_MAXSCENE 3
 #define LCDCONTENT_VALLINES 4
 
-#define VERSION_STRING "0.2.0"
+#define VERSION_STRING "0.3.0"
+
+#define LEDMODE_OFF 0
+#define LEDMODE_ON 1
+#define LEDMODE_ONESHOT 2
 
 typedef struct tLCDCONTENT {
     int scene;
@@ -42,8 +46,6 @@ typedef struct tBEEPCTRL {
 } BEEPCTRL;
 
 static BEEPCTRL beepctrl;
-
-static int loopcount = 0;
 
 void LCDC_init() 
 {
@@ -155,11 +157,12 @@ void LCDC_show_scene2()
 
 
 /**
- * @brief LCDの表示更新
+ * @brief LCDの表示更新． 100ms毎に呼ばれる．
  */
 void LCDC_show()
 {
-    switch(lcdinfo.scene){
+    switch(lcdinfo.scene)
+    {
         case 0:
             LCDC_show_scene0();
             break;
@@ -174,10 +177,18 @@ void LCDC_show()
             break;
     }
 
-    if( lcdinfo.led ){
-        digitalWrite(GPIO_NUM_10, LOW);
-    }else{
+    if( lcdinfo.led != LEDMODE_OFF )
+    {
+        digitalWrite(GPIO_NUM_10, LOW);     // LOWで点灯
+    }
+    else
+    {
         digitalWrite(GPIO_NUM_10, HIGH);
+    }
+
+    if( lcdinfo.led == LEDMODE_ONESHOT)     // oneshot の場合は次のタイミングでは消灯
+    {
+        lcdinfo.led = LEDMODE_OFF;
     }
 }
 
@@ -425,15 +436,15 @@ int serial_cmd(const uint8_t *buf)
         case 'l':
             if( buf[1] == '1' )
             {
-                lcdinfo.led = 1;
+                lcdinfo.led = LEDMODE_ON;
             }
             else if (buf[1] == '2')
             {
-                lcdinfo.led = 2;
+                lcdinfo.led = LEDMODE_ONESHOT;
             }
             else
             {
-                lcdinfo.led = 0;
+                lcdinfo.led = LEDMODE_OFF;
             }
             break;
 
@@ -572,8 +583,8 @@ void beep_trigger(int tone, int count)
 void loop() 
 {
     uint8_t rxc;
+    static uint8_t updatecount = 0;
 
-    loopcount++;
     timerWrite(wdtimer, 0);
 
     M5.update();
@@ -602,10 +613,15 @@ void loop()
     beep_poll();
 
     // 画面は100ms毎に更新
-    if( loopcount % 10 == 0)
+    if( updatecount == 0)
     {
         rtc_read(&lcdinfo.dttime);
         LCDC_show();
+        updatecount = 10;
+    }
+    else
+    {
+        updatecount--;
     }
 
     delay(10);
