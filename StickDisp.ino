@@ -2,8 +2,8 @@
  * @file StickDisp.ino
  * @author a.amg
  * @brief M5stickC plus 用簡易表示端末化プログラム
- * @version 0.3
- * @date 2022-10-22
+ * @version 0.4
+ * @date 2022-11-25
  * 
  * @copyright Copyright (c) 2022
  * 
@@ -22,13 +22,14 @@ hw_timer_t *wdtimer = NULL;
 #define LCDCONTENT_MAXSCENE 3
 #define LCDCONTENT_VALLINES 4
 
-#define VERSION_STRING "0.3.0"
+#define VERSION_STRING "0.4.0"
 
 #define LEDMODE_OFF 0
 #define LEDMODE_ON 1
 #define LEDMODE_ONESHOT 2
 
 typedef struct tLCDCONTENT {
+    bool modified;
     int scene;
     struct tm dttime;
     uint8_t led;
@@ -49,6 +50,7 @@ static BEEPCTRL beepctrl;
 
 void LCDC_init() 
 {
+    lcdinfo.modified = true;
     lcdinfo.scene = 0;
     lcdinfo.toppgstr[0] = "";
     lcdinfo.toppgstr[1] = "";
@@ -142,6 +144,8 @@ void LCDC_show_scene1()
 
 /**
  * @brief シャットダウン画面の描画
+ * 
+ * シャットダウン画面にはバージョン情報も出す
  */
 void LCDC_show_scene2()
 {
@@ -151,6 +155,10 @@ void LCDC_show_scene2()
     sprite.setTextColor(WHITE, MAROON);
     sprite.setCursor(0,M5.Lcd.height()/2 - 13);
     sprite.printf("Shutdown?");
+
+    sprite.setTextFont(2); // 14pix font
+    sprite.setCursor(0,M5.Lcd.height() - 14);
+    sprite.printf("Ver. " VERSION_STRING);
     sprite.pushSprite(0, 0);
 }
 
@@ -160,20 +168,24 @@ void LCDC_show_scene2()
  */
 void LCDC_show()
 {
-    switch(lcdinfo.scene)
+    // 表示内容に変更があった場合のみ再描画
+    if( lcdinfo.modified == true )
     {
-        case 0:
-            LCDC_show_scene0();
-            break;
-        case 1:
-            LCDC_show_scene1();
-            break;
-        case 2:
-            LCDC_show_scene2();
-            break;
-        default:
-            LCDC_show_scene0();
-            break;
+        switch(lcdinfo.scene)
+        {
+            case 0:
+                LCDC_show_scene0();
+                break;
+            case 1:
+                LCDC_show_scene1();
+                break;
+            case 2:
+                LCDC_show_scene2();
+                break;
+            default:
+                LCDC_show_scene0();
+                break;
+        }
     }
 
     // LED点灯状態の更新
@@ -191,6 +203,8 @@ void LCDC_show()
     {
         lcdinfo.led = LEDMODE_OFF;
     }
+
+    lcdinfo.modified = false;
 }
 
 
@@ -414,6 +428,7 @@ int serial_cmd(const uint8_t *buf)
                 return 1;
             }
             lcdinfo.toppgstr[n] = (const char*)&buf[2];
+            lcdinfo.modified = true;
             break;
 
         // 時刻の文字の色
@@ -426,6 +441,7 @@ int serial_cmd(const uint8_t *buf)
             {
                 lcdinfo.clk_color = M5.lcd.color565(cr, cg, cb);
             }
+            lcdinfo.modified = true;
             break;
 
         // Power off
@@ -457,9 +473,10 @@ int serial_cmd(const uint8_t *buf)
                 return 1;
             }
             lcdinfo.scene = scn;
+            lcdinfo.modified = true;
             break;
 
-        // 汎用文字列
+        // 表画面の汎用文字列
         // v10abcdefg という形式で，1が行，0が列を表す．0列目がラベルに相当．
         case 'v':
             l = buf[1] - '0';
@@ -473,6 +490,7 @@ int serial_cmd(const uint8_t *buf)
                 return 1;
             }
             lcdinfo.valuestr[l][c] = (const char*)&buf[3];
+            lcdinfo.modified = true;
             break;
 
         // バージョン取得
@@ -585,6 +603,7 @@ void loop()
 {
     uint8_t rxc;
     static uint8_t updatecount = 0;
+    int tsec;
 
     timerWrite(wdtimer, 0);
 
@@ -609,6 +628,7 @@ void loop()
         {
             lcdinfo.scene = 0;
         }
+        lcdinfo.modified = true;
     }
 
     beep_poll();
@@ -616,7 +636,12 @@ void loop()
     // 画面は100ms毎に更新
     if( updatecount == 0)
     {
+        tsec = lcdinfo.dttime.tm_sec;
         rtc_read(&lcdinfo.dttime);
+        if( tsec != lcdinfo.dttime.tm_sec )
+        {
+            lcdinfo.modified = true;
+        }
         LCDC_show();
         updatecount = 10;
     }
