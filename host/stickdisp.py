@@ -294,7 +294,9 @@ def main(args):
 
     # 100ms周期のループ
     while disploop:
-        # poll()はtimeout=0.1秒で抜ける
+        # poll()はtimeout=0.1秒で抜ける.
+        # pollからは，ボタン操作等のイベントが文字列のリストの形で返される．
+        # callbackを使わずに，ここでイベントを処理することもできる．
         s = disp.poll()
         t = time.time()
         t_now = int(t)
