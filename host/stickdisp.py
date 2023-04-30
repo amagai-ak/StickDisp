@@ -89,11 +89,11 @@ class StickDispCtrl:
         self.ser.write(b'$V\r\n')
         tout = 20
         while tout > 0:
-            rtnstr = self.poll()
-            if rtnstr[0] == 'V':
-                return rtnstr[1:]
-            else:
-                tout = tout - 1
+            for rtnstr in self.poll():
+                if rtnstr[0] == 'V':
+                    return rtnstr[1:]
+                else:
+                    tout = tout - 1
         return None
 
     # 現在時刻の読み出し．1.5秒でタイムアウト．
@@ -103,30 +103,30 @@ class StickDispCtrl:
         self.ser.write(b'$R\r\n')
         tout = 20
         while tout > 0:
-            rtnstr = self.poll()
-            # print(rtnstr)
-            # R20220619220230
-            if len(rtnstr) == 15 and rtnstr[0] == 'R':
-                try:
-                    dy = int(rtnstr[1:5])
-                    dm = int(rtnstr[5:7])
-                    dd = int(rtnstr[7:9])
-                    hh = int(rtnstr[9:11])
-                    mm = int(rtnstr[11:13])
-                    ss = int(rtnstr[13:15])
-                except:
-                    return None
-                # validation
-                if dy <= 2000 or dy >= 3000 or \
-                    dm < 0 or dm > 12 or \
-                    dd < 0 or dd > 31 or \
-                    hh < 0 or hh > 24 or \
-                    mm < 0 or mm > 59 or \
-                    ss < 0 or ss > 59:
-                    return None
-                return (dy, dm, dd, hh, mm, ss)
-            else:
-                tout = tout - 1
+            for rtnstr in self.poll():
+                # print(rtnstr)
+                # R20220619220230
+                if len(rtnstr) == 15 and rtnstr[0] == 'R':
+                    try:
+                        dy = int(rtnstr[1:5])
+                        dm = int(rtnstr[5:7])
+                        dd = int(rtnstr[7:9])
+                        hh = int(rtnstr[9:11])
+                        mm = int(rtnstr[11:13])
+                        ss = int(rtnstr[13:15])
+                    except:
+                        return None
+                    # validation
+                    if dy <= 2000 or dy >= 3000 or \
+                        dm < 0 or dm > 12 or \
+                        dd < 0 or dd > 31 or \
+                        hh < 0 or hh > 24 or \
+                        mm < 0 or mm > 59 or \
+                        ss < 0 or ss > 59:
+                        return None
+                    return (dy, dm, dd, hh, mm, ss)
+                else:
+                    tout = tout - 1
         return None
 
     # コールバック関数の登録．登録解除したい場合にはNoneを指定する．
@@ -154,9 +154,11 @@ class StickDispCtrl:
             cmdstr = '$s' + str(n) + '\r\n'
             self.ser.write(cmdstr.encode())
 
-    # M5StickC側からのメッセージ処理のためのポーリング
+    # M5StickC側からのメッセージ処理のためのポーリング．
+    # 100msで抜ける．
+    # ポーリング中に得られた文字列のリストを返す．
     def poll(self):
-        rtnstr = ''
+        rtnstr = []
         while True:
             c = self.ser.read(1)
             if len(c) > 0:
@@ -167,7 +169,7 @@ class StickDispCtrl:
                     if c == b'\r':
                         # print(self.rxstr)
                         self.rxstat = 0
-                        rtnstr = self.rxstr
+                        rtnstr.append(self.rxstr)
                         if self.callback != None:
                             self.callback(self)
                         self.rxstr = ''
@@ -252,7 +254,7 @@ def main(args):
     if args.version == True:
         vstr = disp.get_version()
         if vstr != None:
-            sys.stdout.write(vstr)
+            sys.stdout.write("%s\n" % vstr)
             disp.close()
             return 0
         else:
